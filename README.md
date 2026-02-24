@@ -24,7 +24,7 @@ By default, it uses the high-precision and fast `large-v3-turbo` model and is op
 
 **1. Clone the repository**
 ```bash
-git clone https://github.com/YOUR_USERNAME/whisper-recorder.git
+git clone https://github.com/FL-spec/whisper-recorder.git
 cd whisper-recorder
 ```
 
