@@ -2,14 +2,14 @@
 """
 ╔══════════════════════════════════════════════════════════╗
 ║         Whisper Recorder  —  Português (PT)              ║
-║   Modelo: faster-whisper large-v3-turbo  |  Local Only   ║
+║   Modelo: faster-whisper large-v3        |  Local Only   ║
 ╚══════════════════════════════════════════════════════════╝
 
 Usage:
     python record.py                    # interactive (press Enter to stop)
     python record.py --max-seconds 60  # auto-stop after 60s
     python record.py --output my.txt   # custom output file
-    python record.py --model large-v3  # use a different model
+    python record.py --model large-v3-turbo  # use a different model
 """
 
 import argparse
@@ -48,7 +48,7 @@ from rich.text import Text
 from rich import print as rprint
 
 # ─── defaults ─────────────────────────────────────────────────────────────────
-DEFAULT_MODEL    = "large-v3-turbo"
+DEFAULT_MODEL    = "large-v3"
 DEFAULT_LANGUAGE = "pt"            # Portuguese
 SAMPLE_RATE      = 16_000          # Whisper expects 16 kHz
 CHANNELS         = 1
@@ -168,16 +168,21 @@ def transcribe(wav_path: str, model_name: str) -> list[dict]:
         console.print("[yellow]⚠  HF_TOKEN não encontrado — download pode ser lento[/yellow]")
 
     console.print(f"[dim]Carregando modelo [bold]{model_name}[/bold]…[/dim]")
-    console.print("[dim](Na primeira execução o modelo será baixado ~800 MB — aguarde, o progresso aparecerá abaixo)[/dim]\n")
+    console.print("[dim](Na primeira execução o modelo será baixado (800 MB a 3 GB) — aguarde, o progresso aparecerá abaixo)[/dim]\n")
+
+    from download_model import download_faster_whisper_model
+    try:
+        download_faster_whisper_model(model_name, hf_token)
+    except Exception as e:
+        console.print(f"[red]Erro ao baixar modelo {model_name}: {e}[/red]")
 
     # Apple Silicon: use int8 on cpu — fastest & most memory-efficient
-    # Pass the token explicitly so the download is authenticated
     model = WhisperModel(
         model_name,
         device="cpu",
         compute_type="int8",
         download_root=None,        # use default HF cache (~/.cache/huggingface)
-        local_files_only=False,
+        local_files_only=False,    # safe because we already downloaded
     )
 
     segments_out = []

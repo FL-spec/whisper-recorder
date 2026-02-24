@@ -6,14 +6,14 @@
 
 A 100% local, blazing-fast voice recorder and transcriber powered by [faster-whisper](https://github.com/SYSTRAN/faster-whisper). Designed specifically for **MacBook Pro with Apple Silicon (M1–M4)**, but runs anywhere that supports Python and `faster-whisper`. 
 
-By default, it uses the high-precision and fast `large-v3-turbo` model and is optimized for Portuguese (PT) dictation, but can transcribe any language supported by Whisper.
+By default, it uses the highly intelligent `large-v3` model and is optimized for Portuguese (PT) dictation, but can transcribe any language supported by Whisper.
 
 ---
 
 ## ✨ Features
 
 - **100% Local & Private:** No audio leaves your machine. Your data is yours.
-- **Blazing Fast Models:** Pre-configured with Hugging Face's `faster-whisper-large-v3-turbo` for near-instant precision.
+- **Highly Accurate Models:** Pre-configured with Hugging Face's `faster-whisper-large-v3` for peak intelligence and precision.
 - **Optimized Downloading:** Utilizes `hf_transfer` to saturate your network connection for model downloading.
 - **Concurrency Bulletproof:** Fixes macOS Python thread segmentation faults by managing `huggingface_hub` concurrent workers correctly.
 - **Live Incremental Transcripts:** Captures live audio and transcribes it incrementally in a beautifully formatted CLI using `Rich`.
@@ -69,7 +69,7 @@ python record.py --no-timestamps
 python download_model.py
 ```
 
-> **Note:** On your very first run, the local model (e.g., `large-v3-turbo` ~1.6 GB) will be quickly downloaded from the Hugging Face Hub. All subsequent executions load instantly from your local cache!
+> **Note:** On your very first run, the local model (e.g., `large-v3` ~3 GB) will be quickly downloaded from the Hugging Face Hub. All subsequent executions load instantly from your local cache!
 
 ---
 
@@ -92,7 +92,7 @@ Every recording is **appended** safely to your target `.txt` file, ensuring no d
 
 | Flag / Parameter | Default | Description |
 |---|---|---|
-| `--model` | `large-v3-turbo` | Faster-Whisper model ID / Hugging Face model |
+| `--model` | `large-v3` | Faster-Whisper model ID / Hugging Face model |
 | `--output` | `transcricao.txt` | Target text file |
 | `--max-seconds` | ∞ | Max duration of the recording before graceful stop |
 | `--no-timestamps` | `False` | Omit `[mm:ss]` styling from the text file output |
