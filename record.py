@@ -48,11 +48,15 @@ from rich.text import Text
 from rich import print as rprint
 
 # ─── defaults ─────────────────────────────────────────────────────────────────
-DEFAULT_MODEL    = "large-v3"
-DEFAULT_LANGUAGE = "pt"            # Portuguese
-SAMPLE_RATE      = 16_000          # Whisper expects 16 kHz
-CHANNELS         = 1
-DTYPE            = "int16"
+DEFAULT_MODEL        = os.environ.get("WHISPER_MODEL", "large-v3")
+DEFAULT_LANGUAGE     = os.environ.get("WHISPER_LANGUAGE", "pt")
+DEFAULT_DEVICE       = os.environ.get("WHISPER_DEVICE", "cpu")
+DEFAULT_COMPUTE_TYPE = os.environ.get("WHISPER_COMPUTE_TYPE", "int8")
+DEFAULT_BEAM_SIZE    = int(os.environ.get("WHISPER_BEAM_SIZE", "5"))
+
+SAMPLE_RATE          = 16_000          # Whisper expects 16 kHz
+CHANNELS             = 1
+DTYPE                = "int16"
 
 console = Console()
 
@@ -61,10 +65,10 @@ console = Console()
 #  Helpers
 # ──────────────────────────────────────────────────────────────────────────────
 
-def banner():
+def banner(model: str, language: str):
     console.print(Panel.fit(
-        "[bold cyan]🎙  Whisper Recorder[/bold cyan]  —  [yellow]Português (PT)[/yellow]\n"
-        f"[dim]Modelo: {DEFAULT_MODEL}  |  100 % local, sem internet[/dim]",
+        f"[bold cyan]🎙  Whisper Recorder[/bold cyan]  —  [yellow]Idioma: {language.upper()}[/yellow]\n"
+        f"[dim]Modelo: {model}  |  100 % local, sem internet[/dim]",
         border_style="cyan",
     ))
 
@@ -152,9 +156,16 @@ def save_temp_wav(audio: np.ndarray) -> str:
     return tmp.name
 
 
-def transcribe(wav_path: str, model_name: str) -> list[dict]:
+def transcribe(
+    wav_path: str,
+    model_name: str,
+    device: str,
+    compute_type: str,
+    language: str,
+    beam_size: int
+) -> list[dict]:
     """
-    Load the faster-whisper model and transcribe the WAV file in Portuguese.
+    Load the faster-whisper model and transcribe the WAV file.
     Returns a list of segment dicts with 'start', 'end', 'text'.
     """
     import os
@@ -176,11 +187,11 @@ def transcribe(wav_path: str, model_name: str) -> list[dict]:
     except Exception as e:
         console.print(f"[red]Erro ao baixar modelo {model_name}: {e}[/red]")
 
-    # Apple Silicon: use int8 on cpu — fastest & most memory-efficient
+    # Load model with specified device and compute type
     model = WhisperModel(
         model_name,
-        device="cpu",
-        compute_type="int8",
+        device=device,
+        compute_type=compute_type,
         download_root=None,        # use default HF cache (~/.cache/huggingface)
         local_files_only=False,    # safe because we already downloaded
     )
@@ -196,8 +207,8 @@ def transcribe(wav_path: str, model_name: str) -> list[dict]:
 
         segments, info = model.transcribe(
             wav_path,
-            language=DEFAULT_LANGUAGE,
-            beam_size=5,
+            language=language,
+            beam_size=beam_size,
             vad_filter=True,               # skip silence
             vad_parameters=dict(
                 min_silence_duration_ms=500,
@@ -254,7 +265,7 @@ def save_txt(text: str, output_path: str) -> None:
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Gravador de voz com Whisper — transcrição em Português",
+        description="Gravador de voz com Whisper — transcrição local",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
@@ -262,6 +273,27 @@ def parse_args():
         "--model", "-m",
         default=DEFAULT_MODEL,
         help=f"Modelo faster-whisper a usar (padrão: {DEFAULT_MODEL})",
+    )
+    parser.add_argument(
+        "--language", "-l",
+        default=DEFAULT_LANGUAGE,
+        help=f"Idioma alvo (padrão: {DEFAULT_LANGUAGE})",
+    )
+    parser.add_argument(
+        "--device", "-d",
+        default=DEFAULT_DEVICE,
+        help=f"Dispositivo de processamento (padrão: {DEFAULT_DEVICE})",
+    )
+    parser.add_argument(
+        "--compute-type", "-c",
+        default=DEFAULT_COMPUTE_TYPE,
+        help=f"Tipo de computação (padrão: {DEFAULT_COMPUTE_TYPE})",
+    )
+    parser.add_argument(
+        "--beam-size", "-b",
+        type=int,
+        default=DEFAULT_BEAM_SIZE,
+        help=f"Beam size do decodificador (padrão: {DEFAULT_BEAM_SIZE})",
     )
     parser.add_argument(
         "--output", "-o",
@@ -291,7 +323,7 @@ def parse_args():
 def main():
     args = parse_args()
 
-    banner()
+    banner(args.model, args.language)
 
     if args.list_devices:
         console.print(sd.query_devices())
@@ -305,7 +337,14 @@ def main():
 
     try:
         # 3 — Transcribe
-        segments = transcribe(wav_path, model_name=args.model)
+        segments = transcribe(
+            wav_path,
+            model_name=args.model,
+            device=args.device,
+            compute_type=args.compute_type,
+            language=args.language,
+            beam_size=args.beam_size,
+        )
 
         if not segments:
             console.print("[yellow]⚠  Nenhum texto detectado na gravação.[/yellow]")

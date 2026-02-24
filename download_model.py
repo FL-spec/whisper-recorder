@@ -11,6 +11,7 @@ import sys
 import time
 import logging
 import re
+import argparse
 
 os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
 
@@ -39,7 +40,16 @@ def download_faster_whisper_model(model_name: str, hf_token: str = None):
     )
 
 if __name__ == "__main__":
-    # ── 1. Load .env token ────────────────────────────────────────────────────────
+    # ── 1. Parse arguments ────────────────────────────────────────────────────────
+    parser = argparse.ArgumentParser(description="Download faster-whisper models")
+    parser.add_argument(
+        "models",
+        nargs="*",
+        help="List of models or repo IDs to download. Defaults to 'large-v3' and 'large-v3-turbo' or WHISPER_MODELS_TO_DOWNLOAD env var."
+    )
+    args = parser.parse_args()
+
+    # ── 2. Load .env token ────────────────────────────────────────────────────────
     from dotenv import load_dotenv
     load_dotenv()
 
@@ -64,14 +74,30 @@ if __name__ == "__main__":
 
     log = logging.getLogger("download_model")
 
-    # ── 3. Models to download ──────────────────────────────────────────────────────
-    MODELS_TO_DOWNLOAD = [
-        {"alias": "large-v3", "repo": "Systran/faster-whisper-large-v3"},
-        {"alias": "large-v3-turbo", "repo": "mobiuslabsgmbh/faster-whisper-large-v3-turbo"},
-    ]
+    # ── 4. Models to download ──────────────────────────────────────────────────────
+    # User can specify models via CLI args, env var 'WHISPER_MODELS_TO_DOWNLOAD', or defaults
+    from faster_whisper.utils import _MODELS
+    
+    if args.models:
+        model_names = args.models
+    else:
+        env_models = os.environ.get("WHISPER_MODELS_TO_DOWNLOAD")
+        if env_models:
+            model_names = [m.strip() for m in env_models.split(",")]
+        else:
+            model_names = ["large-v3", "large-v3-turbo"]
+
+    MODELS_TO_DOWNLOAD = []
+    for model_name in model_names:
+        repo_id = model_name if re.match(r".*/.*", model_name) else _MODELS.get(model_name)
+        if not repo_id:
+            log.warning(f"Modelo não encontrado para o alias: {model_name}, usando como repositório.")
+            repo_id = model_name
+        MODELS_TO_DOWNLOAD.append({"alias": model_name, "repo": repo_id})
+
     CACHE_DIR   = os.path.expanduser("~/.cache/huggingface/hub")
 
-    # ── 4. Pre-flight checks ──────────────────────────────────────────────────────
+    # ── 5. Pre-flight checks ──────────────────────────────────────────────────────
     print("\n" + "─" * 60)
     print("  🔍  Pre-flight checks")
     print("─" * 60)
@@ -90,7 +116,7 @@ if __name__ == "__main__":
         print(f"❌  Não foi possível conectar ao HuggingFace: {e}")
         sys.exit(1)
 
-    # ── 5. Login ──────────────────────────────────────────────────────────────────
+    # ── 6. Login ──────────────────────────────────────────────────────────────────
     import huggingface_hub
     if HF_TOKEN:
         print(f"🔑  Autenticando com HuggingFace Hub (versão {huggingface_hub.__version__}) …", flush=True)
@@ -100,7 +126,7 @@ if __name__ == "__main__":
     else:
         print(f"☁️  Prosseguindo anonimamente com HuggingFace Hub (versão {huggingface_hub.__version__}) …\n")
 
-    # ── 6/7/8. Loop and Download/Test ─────────────────────────────────────────────
+    # ── 7/8/9. Loop and Download/Test ─────────────────────────────────────────────
     for m in MODELS_TO_DOWNLOAD:
         MODEL_ALIAS = m["alias"]
         MODEL_NAME = m["repo"]

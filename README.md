@@ -90,13 +90,20 @@ Every recording is **appended** safely to your target `.txt` file, ensuring no d
 
 ## 🔧 Deep-Dive Configuration
 
-| Flag / Parameter | Default | Description |
-|---|---|---|
-| `--model` | `large-v3` | Faster-Whisper model ID / Hugging Face model |
-| `--output` | `transcricao.txt` | Target text file |
-| `--max-seconds` | ∞ | Max duration of the recording before graceful stop |
-| `--no-timestamps` | `False` | Omit `[mm:ss]` styling from the text file output |
-| `--list-devices` | `False` | Display a list of available host audio devices |
+You can configure the properties using **Command Line Arguments** or by setting **Environment Variables** (e.g., in your `.env` file). CLI arguments always take precedence.
+
+| Environment Variable | CLI Argument | Default | Description |
+|---|---|---|---|
+| `WHISPER_MODEL` | `--model` / `-m` | `large-v3` | Faster-Whisper model ID or target Hugging Face model |
+| `WHISPER_LANGUAGE` | `--language` / `-l` | `pt` | Target language for dictation (forces Whisper to skip auto-detection) |
+| `WHISPER_DEVICE` | `--device` / `-d` | `cpu` | Processing device. Options: `cpu`, `cuda`, `auto` |
+| `WHISPER_COMPUTE_TYPE` | `--compute-type` / `-c`| `int8` | Compute quantization. Options: `int8`, `float16`, `float32` |
+| `WHISPER_BEAM_SIZE` | `--beam-size` / `-b`  | `5` | Beam size for the decoder. Higher = more accurate but slower |
+| - | `--output` / `-o` | `transcricao.txt` | Target text file |
+| - | `--max-seconds` / `-s`| ∞ | Max duration of the recording before graceful stop |
+| - | `--no-timestamps` | `False` | Omit `[mm:ss]` styling from the text file output |
+| - | `--list-devices` | `False` | Display a list of available host audio devices |
+| `WHISPER_MODELS_TO_DOWNLOAD`| `download_model.py [models]`| `large-v3,large-v3-turbo` | Comma-separated list of models to download by default when running `download_model.py` |
 
 ---
 
