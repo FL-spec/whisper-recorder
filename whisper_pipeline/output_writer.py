@@ -43,17 +43,26 @@ class OutputWriter:
 
         Returns the updated FinalOutput (with transcript_path and summary_path set).
         """
-        output_dir = Path(config.pipeline.output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
+        # Use the audio file's parent directory as the output folder.
+        # When called from run.py, this is already the dedicated recording
+        # subfolder: outputs/recording_YYYY-MM-DD_HH-MM-SS/
+        # When called with an arbitrary --file, we create a sibling folder
+        # named after the audio stem so files stay grouped.
+        audio_p = Path(audio_path)
+        if audio_p.parent.name == audio_p.stem:
+            # Audio lives in its own named folder already (normal case)
+            recording_dir = audio_p.parent
+        else:
+            # External file: create a subfolder next to it
+            recording_dir = audio_p.parent / audio_p.stem
+            recording_dir.mkdir(parents=True, exist_ok=True)
 
-        stem = Path(audio_path).stem
         fmt = config.pipeline.output_format
-
         ext_map = {"markdown": "md", "plaintext": "txt", "json": "json"}
         ext = ext_map[fmt]
 
-        transcript_path = output_dir / f"{stem}_transcript.{ext}"
-        summary_path = output_dir / f"{stem}_summary.{ext}"
+        transcript_path = recording_dir / f"transcript.{ext}"
+        summary_path    = recording_dir / f"summary.{ext}"
 
         # Write transcript
         if fmt == "markdown":
@@ -129,19 +138,12 @@ class OutputWriter:
         if fo.topics:
             lines += ["## Topics", ""]
             for i, topic in enumerate(fo.topics, 1):
-                blocks_str = ", ".join(str(b) for b in topic.referenced_blocks) if topic.referenced_blocks else "—"
                 lines += [
                     f"### {i}. {topic.title}",
-                    f"*(Blocks: {blocks_str})*",
                     "",
                     topic.summary,
                     "",
                 ]
-                if topic.subtopics:
-                    lines.append("**Subtopics:**")
-                    for st in topic.subtopics:
-                        lines.append(f"- {st}")
-                    lines.append("")
                 if topic.key_points:
                     lines.append("**Key Points:**")
                     for kp in topic.key_points:

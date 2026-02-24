@@ -13,9 +13,17 @@ from pydantic import BaseModel, Field, model_validator
 class WordToken(BaseModel):
     """A single transcribed word with precise timestamps."""
 
-    word: str = Field(..., description="The transcribed word (may include leading/trailing spaces).")
+    word: str  = Field(..., description="The transcribed word (may include leading/trailing spaces).")
     start: float = Field(..., ge=0.0, description="Word start time in seconds from the beginning of the audio.")
-    end: float = Field(..., ge=0.0, description="Word end time in seconds from the beginning of the audio.")
+    end: float   = Field(..., ge=0.0, description="Word end time in seconds from the beginning of the audio.")
+    is_segment_start: bool = Field(
+        False,
+        description=(
+            "True for the first word of each Whisper segment. "
+            "Used by the aligner to create readable paragraph breaks "
+            "when speaker diarization is unavailable."
+        ),
+    )
 
     @model_validator(mode="after")
     def end_after_start(self) -> "WordToken":

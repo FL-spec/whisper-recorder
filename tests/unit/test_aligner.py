@@ -97,9 +97,10 @@ class TestBasicAlignment:
         assert result[0].speaker_id == "SPK_01"
 
     def test_word_before_all_speakers(self, aligner, config):
+        # Gap > 2.0s so it doesn't snap
         words = [word("pre", 0.1, 0.5)]
-        speakers = [speaker("SPK_00", 1.0, 5.0)]
-
+        speakers = [speaker("SPK_00", 3.0, 5.0)]
+    
         result = aligner.align(words, speakers, config)
         assert result[0].speaker_id == "UNKNOWN"
 
@@ -111,14 +112,25 @@ class TestBasicAlignment:
         assert result[0].speaker_id == "UNKNOWN"
 
     def test_word_in_gap_between_speakers(self, aligner, config):
-        # Gap: 5.0 – 7.0 — word midpoint 6.0 is in gap
-        words = [word("gap", 5.5, 6.5)]
+        # Gap: 5.0 – 10.0 (> 4 sec gap); midpoint 7.5 is 2.5s from nearest speaker (> 2.0s tolerance)
+        words = [word("gap", 7.0, 8.0)]
         speakers = [
             speaker("SPK_00", 0.0, 5.0),
-            speaker("SPK_01", 7.0, 10.0),
+            speaker("SPK_01", 10.0, 15.0),
         ]
         result = aligner.align(words, speakers, config)
         assert result[0].speaker_id == "UNKNOWN"
+
+    def test_word_snaps_to_closest_speaker(self, aligner, config):
+        # midpoint is 6.0; dist to SPK_00 is 1.0, dist to SPK_01 is 2.0. 
+        # Both within 2.0 tolerance, but 1.0 is closer.
+        words = [word("snap", 5.5, 6.5)]
+        speakers = [
+            speaker("SPK_00", 0.0, 5.0),
+            speaker("SPK_01", 8.0, 10.0),
+        ]
+        result = aligner.align(words, speakers, config)
+        assert result[0].speaker_id == "SPK_00"
 
 
 class TestEdgeCases:

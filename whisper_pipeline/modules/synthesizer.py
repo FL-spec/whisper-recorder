@@ -25,6 +25,7 @@ from whisper_pipeline.config import PipelineConfig
 from whisper_pipeline.interfaces.synthesizer import AbstractSynthesizer
 from whisper_pipeline.models.block_result import BlockResult
 from whisper_pipeline.models.final_output import FinalOutput, GlobalTopic, SpeakerProfile
+from whisper_pipeline.modules.extractor import OllamaExtractor   # for _language_name
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,7 @@ class OllamaSynthesizer(AbstractSynthesizer):
             prompt_template,
             num_blocks=str(len(blocks)),
             blocks_json=blocks_text,
+            language_name=OllamaExtractor._language_name(config.whisper.language),
         )
 
         logger.info(

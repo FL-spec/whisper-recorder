@@ -87,12 +87,13 @@ class WhisperTranscriber(AbstractTranscriber):
                 )
                 continue
 
-            for w in segment.words:
+            for i, w in enumerate(segment.words):
                 words.append(
                     WordToken(
                         word=w.word,
                         start=w.start,
                         end=w.end,
+                        is_segment_start=(i == 0),   # first word of Whisper segment
                     )
                 )
 

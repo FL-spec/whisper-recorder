@@ -18,8 +18,8 @@ diarization:
   enabled: true             # Set to false to skip (all text labelled UNKNOWN).
                             # HuggingFace token is read from HF_TOKEN in .env
   device: cpu               # cpu | cuda
-  min_speakers: null        # Optional hint (null = auto-detect)
-  max_speakers: null        # Optional hint (null = auto-detect)
+  min_speakers: 1           # Optional hint (null = auto-detect)
+  max_speakers: 5           # Optional hint (null = auto-detect)
 
 # ── Pieces 4 & 5: Ollama (LLM) ───────────────────────────────
 llm:

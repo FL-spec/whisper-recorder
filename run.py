@@ -198,19 +198,24 @@ def record_audio(max_seconds: int | None = None) -> np.ndarray:
 
 def save_audio(audio: np.ndarray, output_dir: str) -> str:
     """
-    Save the recording as a permanent WAV file (not a temp file).
+    Save the recording inside its own dedicated subfolder:
+        outputs/recording_YYYY-MM-DD_HH-MM-SS/
+            recording_YYYY-MM-DD_HH-MM-SS.wav
 
-    The file is kept so you can re-run the pipeline on it later:
-        python pipeline.py outputs/recording_2026-02-24_20-53.wav
+    The transcript and summary will be written into the same folder by
+    OutputWriter, so every recording's files stay together.
 
     Returns the absolute path to the saved WAV.
     """
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    wav_path = Path(output_dir) / f"recording_{timestamp}.wav"
+    name = f"recording_{timestamp}"
+    recording_dir = Path(output_dir) / name
+    recording_dir.mkdir(parents=True, exist_ok=True)
+    wav_path = recording_dir / f"{name}.wav"
     wavfile.write(str(wav_path), SAMPLE_RATE, audio)
     console.print(f"[dim]📼  Audio saved: {wav_path}[/dim]")
     return str(wav_path)
+
 
 
 # ──────────────────────────────────────────────────────────────────────────────

@@ -62,12 +62,10 @@ class TimestampAligner(AbstractAligner):
         if not speakers:
             logger.info(
                 "No speaker segments provided (diarization disabled or failed). "
-                "All words will be labelled '%s'.",
+                "Splitting on Whisper segment boundaries — all speakers labelled '%s'.",
                 _UNKNOWN_SPEAKER,
             )
-            return self._group_into_segments(
-                [(w, _UNKNOWN_SPEAKER) for w in words]
-            )
+            return self._split_by_whisper_segments(words)
 
         # Build sorted index arrays for binary search:
         # speaker_starts[i] = start time of speakers[i]
@@ -102,30 +100,90 @@ class TimestampAligner(AbstractAligner):
     # ── Private helpers ────────────────────────────────────────────────────────
 
     @staticmethod
+    def _split_by_whisper_segments(words: list[WordToken]) -> list[AlignedSegment]:
+        """
+        Group words into AlignedSegments using Whisper's natural segment
+        boundaries (is_segment_start=True) when diarization data is absent.
+
+        This replaces the single giant UNKNOWN block with one segment per
+        Whisper pause/sentence so the transcript is readable and the LLM
+        receives sentence-level paragraphs rather than a wall of text.
+        """
+        if not words:
+            return []
+
+        segments: list[AlignedSegment] = []
+        current: list[WordToken] = []
+
+        for word in words:
+            if word.is_segment_start and current:
+                # Flush previous segment
+                segments.append(AlignedSegment(
+                    text=(" ".join(w.clean_word for w in current)).strip(),
+                    speaker_id=_UNKNOWN_SPEAKER,
+                    start=current[0].start,
+                    end=current[-1].end,
+                ))
+                current = []
+            current.append(word)
+
+        # Flush final segment
+        if current:
+            segments.append(AlignedSegment(
+                text=(" ".join(w.clean_word for w in current)).strip(),
+                speaker_id=_UNKNOWN_SPEAKER,
+                start=current[0].start,
+                end=current[-1].end,
+            ))
+
+        logger.info(
+            "No diarization: split %d words into %d Whisper segments.",
+            len(words), len(segments),
+        )
+        return segments
+
+
+    @staticmethod
     def _find_speaker(
         midpoint: float,
         speakers: list[SpeakerSegment],
         speaker_starts: list[float],
+        tolerance: float = 2.0,
     ) -> str:
         """
         Binary-search for the speaker segment that contains *midpoint*.
-
-        Uses bisect_right to find the rightmost segment whose start is <= midpoint,
-        then checks whether the midpoint also falls before that segment's end.
-
-        Returns _UNKNOWN_SPEAKER if no segment contains the midpoint.
+        If the midpoint falls in an unlabelled gap, snap to the closest segment
+        if it is within `tolerance` seconds.
         """
-        # Find the insertion point for midpoint in speaker_starts.
-        # idx - 1 is the last segment that started at or before midpoint.
-        idx = bisect.bisect_right(speaker_starts, midpoint) - 1
-
-        if idx < 0:
-            # midpoint is before every segment's start
+        if not speakers:
             return _UNKNOWN_SPEAKER
 
-        candidate = speakers[idx]
-        if candidate.contains(midpoint):
-            return candidate.speaker_id
+        idx = bisect.bisect_right(speaker_starts, midpoint) - 1
+
+        # Check if it falls exactly inside the left candidate
+        if idx >= 0 and speakers[idx].contains(midpoint):
+            return speakers[idx].speaker_id
+
+        # It's in a gap. Find the distance to the left and right segments.
+        dist_left = float('inf')
+        speaker_left = _UNKNOWN_SPEAKER
+        if idx >= 0:
+            # Distance from the end of the left segment to midpoint
+            dist_left = midpoint - speakers[idx].end
+            speaker_left = speakers[idx].speaker_id
+
+        dist_right = float('inf')
+        speaker_right = _UNKNOWN_SPEAKER
+        if idx + 1 < len(speakers):
+            # Distance from midpoint to the start of the right segment
+            dist_right = speakers[idx + 1].start - midpoint
+            speaker_right = speakers[idx + 1].speaker_id
+
+        if min(dist_left, dist_right) <= tolerance:
+            if dist_left <= dist_right:
+                return speaker_left
+            else:
+                return speaker_right
 
         return _UNKNOWN_SPEAKER
 
@@ -137,8 +195,12 @@ class TimestampAligner(AbstractAligner):
         Group consecutively same-speaker (word, speaker_id) pairs into
         AlignedSegment objects.
 
-        Words within a group are concatenated with a single space. The group's
-        start/end timestamps come from the first/last word respectively.
+        We break a group and start a new one if:
+        1. The speaker changes.
+        2. Whisper marked this word as the start of a natural pause/segment
+           (is_segment_start=True).
+
+        This ensures long monologues remain broken into readable paragraphs.
         """
         if not labelled:
             return []
@@ -148,27 +210,26 @@ class TimestampAligner(AbstractAligner):
         current_speaker: str = labelled[0][1]
 
         for word, speaker_id in labelled:
-            if speaker_id == current_speaker:
-                current_words.append(word)
-            else:
-                # Flush current group
+            speaker_changed = (speaker_id != current_speaker)
+            # Break if it's a new speaker OR it's a new Whisper segment
+            if (speaker_changed or word.is_segment_start) and current_words:
                 segments.append(
                     AlignedSegment(
-                        text=" ".join(w.clean_word for w in current_words),
+                        text=" ".join(w.clean_word for w in current_words).strip(),
                         speaker_id=current_speaker,
                         start=current_words[0].start,
                         end=current_words[-1].end,
                     )
                 )
-                # Start new group
-                current_words = [word]
+                current_words = []
                 current_speaker = speaker_id
+                
+            current_words.append(word)
 
-        # Flush the final group
         if current_words:
             segments.append(
                 AlignedSegment(
-                    text=" ".join(w.clean_word for w in current_words),
+                    text=" ".join(w.clean_word for w in current_words).strip(),
                     speaker_id=current_speaker,
                     start=current_words[0].start,
                     end=current_words[-1].end,

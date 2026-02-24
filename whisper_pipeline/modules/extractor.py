@@ -77,6 +77,7 @@ class OllamaExtractor(AbstractExtractor):
                 block_time=f"{_fmt(start_time)} \u2192 {_fmt(end_time)}",
                 glossary_section=glossary_section,
                 transcript_text=safe_transcript,
+                language_name=self._language_name(config.whisper.language),
             )
 
             result = self._call_llm(
@@ -117,6 +118,28 @@ class OllamaExtractor(AbstractExtractor):
         for key, value in kwargs.items():
             result = result.replace(f"<<{key}>>", value)
         return result
+
+    @staticmethod
+    def _language_name(iso_code: str) -> str:
+        """Map ISO 639-1 code to a full language name for the LLM instruction."""
+        _MAP = {
+            "pt": "Portuguese",
+            "en": "English",
+            "es": "Spanish",
+            "fr": "French",
+            "de": "German",
+            "it": "Italian",
+            "zh": "Chinese",
+            "ja": "Japanese",
+            "ko": "Korean",
+            "ru": "Russian",
+            "ar": "Arabic",
+            "nl": "Dutch",
+            "pl": "Polish",
+            "tr": "Turkish",
+            "sv": "Swedish",
+        }
+        return _MAP.get(iso_code.lower(), iso_code.upper())
 
     # ── Block splitting ────────────────────────────────────────────────────────
 
@@ -217,9 +240,15 @@ class OllamaExtractor(AbstractExtractor):
 
                 data = json.loads(raw_json)
 
-                topics    = [Topic(**t)           for t in data.get("topics", [])]
-                questions = [StudentQuestion(**q) for q in data.get("student_questions", [])]
-                notices   = [str(n)               for n in data.get("logistical_notices", [])]
+                topics    = [self._coerce_topic(t)    for t in data.get("topics", [])
+                             if t]
+                questions = [self._coerce_question(q) for q in data.get("student_questions", [])
+                             if q]
+                notices   = [str(n) for n in data.get("logistical_notices", []) if n]
+
+                # Filter out None returns from coercions that couldn't salvage the item
+                topics    = [t for t in topics    if t is not None]
+                questions = [q for q in questions if q is not None]
 
                 return BlockResult(
                     block_index=block_index,
@@ -258,7 +287,63 @@ class OllamaExtractor(AbstractExtractor):
 
         return BlockResult(block_index=block_index, start_time=start_time, end_time=end_time)
 
+    # ── LLM output coercion ────────────────────────────────────────────────────
+
+    @staticmethod
+    def _coerce_topic(raw) -> "Topic | None":
+        """
+        Normalise whatever llama returned for a topic item into a Topic.
+
+        llama3.1:8b sometimes returns:
+          - a proper dict: {"title": "...", "summary": "...", "key_points": [...]}
+          - a plain string: "Primeira lei da termodinâmica"
+          - a dict with extra/missing keys
+
+        Returns None if the item is completely unsalvageable.
+        """
+        try:
+            if isinstance(raw, str):
+                return Topic(title=raw.strip(), summary="", key_points=[])
+            if isinstance(raw, dict):
+                allowed = {"title", "summary", "key_points", "definitions"}
+                clean = {k: v for k, v in raw.items() if k in allowed}
+                clean.setdefault("title", "Untitled")
+                clean.setdefault("summary", "")
+                kp = clean.get("key_points", [])
+                if isinstance(kp, str):
+                    clean["key_points"] = [kp]
+                elif isinstance(kp, list):
+                    clean["key_points"] = [str(k) for k in kp if k]
+                else:
+                    clean["key_points"] = []
+                return Topic(**clean)
+        except Exception as exc:
+            logger.debug("Could not coerce topic item %r: %s", raw, exc)
+        return None
+
+    @staticmethod
+    def _coerce_question(raw) -> "StudentQuestion | None":
+        """
+        Normalise whatever llama returned for a student_question item.
+        Handles plain strings and dicts with missing/extra keys.
+        """
+        try:
+            if isinstance(raw, str):
+                return StudentQuestion(question=raw.strip(), answer_summary="")
+            if isinstance(raw, dict):
+                allowed = {"question", "answer_summary", "timestamp_approx"}
+                clean = {k: v for k, v in raw.items() if k in allowed}
+                clean.setdefault("question", "")
+                clean.setdefault("answer_summary", "")
+                if not clean["question"]:
+                    return None
+                return StudentQuestion(**clean)
+        except Exception as exc:
+            logger.debug("Could not coerce question item %r: %s", raw, exc)
+        return None
+
     # ── JSON cleanup helpers ────────────────────────────────────────────────────
+
 
     @staticmethod
     def _strip_fences(text: str) -> str:

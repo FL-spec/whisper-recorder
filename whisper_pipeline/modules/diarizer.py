@@ -95,13 +95,31 @@ class PyannoteDiarizer(AbstractDiarizer):
                 token=dc.hf_token,
             )
         except Exception as exc:
-            logger.error(
-                "Failed to load Pyannote pipeline. "
-                "Make sure you have accepted the model licence at "
-                "https://hf.co/%s\nError: %s",
-                _PYANNOTE_MODEL,
-                exc,
-            )
+            import huggingface_hub.errors as _hf_err
+            if isinstance(exc, _hf_err.GatedRepoError):
+                # Extract the repo name from the error if possible
+                err_str = str(exc)
+                logger.error(
+                    "Pyannote model access denied (GatedRepoError).\n"
+                    "One or more gated sub-models still need licence acceptance.\n"
+                    "Run this to check which ones:\n"
+                    "  python -c \"\n"
+                    "  import os, huggingface_hub as hh; hh.login(token=os.environ['HF_TOKEN'])\n"
+                    "  for m in ['pyannote/speaker-diarization-3.1','pyannote/segmentation-3.0']:\n"
+                    "      try: hh.hf_hub_download(m,'config.yaml'); print('OK', m)\n"
+                    "      except: print('LOCKED', m)\n"
+                    "  \"\n"
+                    "Details: %s",
+                    err_str[:300],
+                )
+            else:
+                logger.error(
+                    "Failed to load Pyannote pipeline. "
+                    "Make sure you have accepted the model licence at "
+                    "https://hf.co/%s\nError: %s",
+                    _PYANNOTE_MODEL,
+                    exc,
+                )
             self._pipeline = None
             return []
 
@@ -120,7 +138,43 @@ class PyannoteDiarizer(AbstractDiarizer):
         logger.info("Running diarization on '%s'…", path.name)
 
         try:
-            diarization = pipeline(str(path), **diarize_kwargs)
+            # Load audio with scipy (pure Python, zero FFmpeg dependency).
+            # torchaudio uses the same broken torchcodec/FFmpeg stack, so we
+            # avoid it entirely. scipy reads WAV with no native codec at all.
+            import numpy as np
+            import torch
+            from scipy.io import wavfile as _wavfile
+
+            sr, data = _wavfile.read(str(path))
+
+            # Normalise to float32 in [-1, 1]
+            if data.dtype == np.int16:
+                data = data.astype(np.float32) / 32768.0
+            elif data.dtype == np.int32:
+                data = data.astype(np.float32) / 2147483648.0
+            elif data.dtype != np.float32:
+                data = data.astype(np.float32)
+
+            # Ensure shape is (channels, samples)
+            if data.ndim == 1:
+                data = data[np.newaxis, :]   # mono → (1, T)
+            else:
+                data = data.T                # (T, C) → (C, T)
+
+            waveform = torch.from_numpy(data)
+            audio_input = {"waveform": waveform, "sample_rate": sr}
+            result_obj = pipeline(audio_input, **diarize_kwargs)
+
+            # Pyannote 3.1 returns a DiarizeOutput object here, which wraps the 
+            # actual Annotation we need. Extract it if itertracks is not present:
+            if hasattr(result_obj, "itertracks"):
+                diarization = result_obj
+            elif hasattr(result_obj, "speaker_diarization"):
+                diarization = result_obj.speaker_diarization
+            else:
+                logger.error("Diarization result format unknown: %s", type(result_obj))
+                return []
+
         except Exception as exc:
             logger.error("Diarization failed: %s — continuing with UNKNOWN speakers.", exc)
             return []
