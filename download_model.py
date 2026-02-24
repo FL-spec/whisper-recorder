@@ -19,11 +19,10 @@ load_dotenv()
 
 HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
 if not HF_TOKEN:
-    print("❌  HF_TOKEN não encontrado no .env — abortando.")
-    sys.exit(1)
-
-os.environ["HF_TOKEN"] = HF_TOKEN
-os.environ["HUGGING_FACE_HUB_TOKEN"] = HF_TOKEN
+    print("⚠️  HF_TOKEN não encontrado no .env. O download continuará sem autenticação.")
+else:
+    os.environ["HF_TOKEN"] = HF_TOKEN
+    os.environ["HUGGING_FACE_HUB_TOKEN"] = HF_TOKEN
 
 # ── 2. Enable full HF Hub + urllib3 debug logging ────────────────────────────
 logging.basicConfig(
@@ -49,7 +48,7 @@ CACHE_DIR   = os.path.expanduser("~/.cache/huggingface/hub")
 print("\n" + "─" * 60)
 print("  🔍  Pre-flight checks")
 print("─" * 60)
-print(f"  Token  : {HF_TOKEN[:12]}…")
+print(f"  Token  : {HF_TOKEN[:12]+'…' if HF_TOKEN else 'Não configurado (Anônimo)'}")
 print(f"  Models : {[m['alias'] for m in MODELS_TO_DOWNLOAD]}")
 print(f"  Cache  : {CACHE_DIR}")
 print("─" * 60 + "\n")
@@ -66,10 +65,13 @@ except Exception as e:
 
 # ── 5. Login ──────────────────────────────────────────────────────────────────
 import huggingface_hub
-print(f"🔑  Autenticando com HuggingFace Hub (versão {huggingface_hub.__version__}) …", flush=True)
-huggingface_hub.login(token=HF_TOKEN, add_to_git_credential=False)
-whoami = huggingface_hub.whoami()
-print(f"✅  Logged in as: {whoami.get('name', whoami.get('fullname', '?'))}\n")
+if HF_TOKEN:
+    print(f"🔑  Autenticando com HuggingFace Hub (versão {huggingface_hub.__version__}) …", flush=True)
+    huggingface_hub.login(token=HF_TOKEN, add_to_git_credential=False)
+    whoami = huggingface_hub.whoami(token=HF_TOKEN)
+    print(f"✅  Logged in as: {whoami.get('name', whoami.get('fullname', '?'))}\n")
+else:
+    print(f"☁️  Prosseguindo anonimamente com HuggingFace Hub (versão {huggingface_hub.__version__}) …\n")
 
 # ── 6/7/8. Loop and Download/Test ─────────────────────────────────────────────
 for m in MODELS_TO_DOWNLOAD:
