@@ -1,109 +1,113 @@
-# 🎙 Whisper Recorder — Português
+# 🎙 Whisper Recorder
 
-Gravador de voz 100% local com transcrição em Português via **faster-whisper** (`large-v3-turbo`).  
-Desenvolvido para **MacBook Pro com Apple Silicon (M1–M4)**.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)](https://www.apple.com/macos/)
+
+A 100% local, blazing-fast voice recorder and transcriber powered by [faster-whisper](https://github.com/SYSTRAN/faster-whisper). Designed specifically for **MacBook Pro with Apple Silicon (M1–M4)**, but runs anywhere that supports Python and `faster-whisper`. 
+
+By default, it uses the high-precision and fast `large-v3-turbo` model and is optimized for Portuguese (PT) dictation, but can transcribe any language supported by Whisper.
 
 ---
 
-## ⚡ Instalação (uma vez só)
+## ✨ Features
 
+- **100% Local & Private:** No audio leaves your machine. Your data is yours.
+- **Blazing Fast Models:** Pre-configured with Hugging Face's `faster-whisper-large-v3-turbo` for near-instant precision.
+- **Optimized Downloading:** Utilizes `hf_transfer` to saturate your network connection for model downloading.
+- **Concurrency Bulletproof:** Fixes macOS Python thread segmentation faults by managing `huggingface_hub` concurrent workers correctly.
+- **Live Incremental Transcripts:** Captures live audio and transcribes it incrementally in a beautifully formatted CLI using `Rich`.
+
+---
+
+## ⚡ Installation (One-Time Setup)
+
+**1. Clone the repository**
 ```bash
-# 1. Crie e ative o ambiente virtual
+git clone https://github.com/YOUR_USERNAME/whisper-recorder.git
+cd whisper-recorder
+```
+
+**2. Create and activate a Virtual Environment**
+```bash
 python3 -m venv .venv
 source .venv/bin/activate
+```
 
-# 2. Instale as dependências
+**3. Install Dependencies**
+```bash
 pip install -r requirements.txt
 ```
 
-> **Nota:** Na primeira execução o modelo `large-v3-turbo` (~800 MB) será baixado automaticamente do Hugging Face e cacheado localmente. As execuções seguintes são instantâneas.
+**4. Set up an Environment File (Optional, but highly recommended for fast downloads)**
+Copy the provided `.env.example` file:
+```bash
+cp .env.example .env
+```
+Then, insert your Hugging Face token in `.env` if you have one. This guarantees maximum download speed using `hf_transfer`.
 
 ---
 
-## 🚀 Como usar
+## 🚀 Usage
+
+Execute `record.py` inside your active virtual environment.
 
 ```bash
-# Ative o ambiente (se ainda não ativado)
-source .venv/bin/activate
-
-# Gravar → pressione Enter para parar → transcrição salva em transcricao.txt
+# Start recording → Press Enter to stop → Output saved to 'transcricao.txt'
 python record.py
 
-# Parar automaticamente após 60 segundos
+# Stop automatically after 60 seconds
 python record.py --max-seconds 60
 
-# Salvar em arquivo personalizado
-python record.py --output reuniao_2024.txt
+# Save to a custom output file
+python record.py --output my_meeting_notes.txt
 
-# Sem marcações de tempo no arquivo de saída
+# Disable timestamp prefixes in output
 python record.py --no-timestamps
 
-# Usar o modelo maior (mais preciso, mais lento)
-python record.py --model large-v3
-
-# Ver dispositivos de áudio disponíveis
-python record.py --list-devices
+# Pre-download the model explicitly (Optional, record.py will also download it organically)
+python download_model.py
 ```
+
+> **Note:** On your very first run, the local model (e.g., `large-v3-turbo` ~1.6 GB) will be quickly downloaded from the Hugging Face Hub. All subsequent executions load instantly from your local cache!
 
 ---
 
-## 📂 Arquivos de saída
+## 📂 Output Format
 
-Cada gravação é **acrescentada** ao arquivo `.txt` (não substitui), com cabeçalho de data/hora:
+Every recording is **appended** safely to your target `.txt` file, ensuring no data override:
 
-```
-# Gravação — 2025-01-15 14:32:10
+```text
+# Gravação — 2026-02-24 14:32:10
 
-[00:02] Olá, este é um teste de gravação.
-[00:08] O sistema está funcionando corretamente.
+[00:02] Hello, this is a local recording test.
+[00:08] The system transcribed this without the internet.
 
 ────────────────────────────────────────────────────────────
-
-# Gravação — 2025-01-15 15:10:45
-...
 ```
 
 ---
 
-## 🔧 Configuração rápida
+## 🔧 Deep-Dive Configuration
 
-| Parâmetro | Padrão | Descrição |
+| Flag / Parameter | Default | Description |
 |---|---|---|
-| `--model` | `large-v3-turbo` | Modelo a usar |
-| `--output` | `transcricao.txt` | Arquivo de saída |
-| `--max-seconds` | ∞ | Duração máxima |
-| `--no-timestamps` | off | Remover marcações de tempo |
-
-### Modelos disponíveis (do mais rápido ao mais preciso)
-
-| Modelo | Tamanho | Velocidade | Precisão |
-|---|---|---|---|
-| `tiny` | ~75 MB | ⚡⚡⚡⚡⚡ | ★★☆☆☆ |
-| `base` | ~145 MB | ⚡⚡⚡⚡ | ★★★☆☆ |
-| `small` | ~244 MB | ⚡⚡⚡ | ★★★★☆ |
-| `medium` | ~769 MB | ⚡⚡ | ★★★★☆ |
-| `large-v3-turbo` | ~809 MB | ⚡⚡⚡ | ★★★★★ ← **recomendado** |
-| `large-v3` | ~1.5 GB | ⚡ | ★★★★★ |
+| `--model` | `large-v3-turbo` | Faster-Whisper model ID / Hugging Face model |
+| `--output` | `transcricao.txt` | Target text file |
+| `--max-seconds` | ∞ | Max duration of the recording before graceful stop |
+| `--no-timestamps` | `False` | Omit `[mm:ss]` styling from the text file output |
+| `--list-devices` | `False` | Display a list of available host audio devices |
 
 ---
 
-## 🛠 Requisitos
+## 🛠 System Requirements
 
-- macOS 12+ com Apple Silicon (M1/M2/M3/M4)
-- Python 3.10+
-- Microfone
+- macOS 12+ with Apple Silicon (M1/M2/M3/M4) is highly recommended for `int8`/`float16` optimizations.
+- **Python 3.10+**
+- Standard Microphone
 
 ---
 
-## 💡 Dica — Criar atalho de terminal
+## 📝 License
 
-Adicione ao seu `~/.zshrc`:
-
-```bash
-alias gravar='cd /Users/franciscolivraghi/Desktop/whisper-recordeer && source .venv/bin/activate && python record.py'
-```
-
-Depois, simplesmente execute:
-```bash
-gravar
-```
+Distributed under the MIT License. See `LICENSE` for more information.
