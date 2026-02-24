@@ -1,0 +1,54 @@
+# ══════════════════════════════════════════════════════════════
+#  Whisper Pipeline v2 — Configuration
+#  Edit this file to change pipeline behaviour.
+#  All parameters are validated on startup — nothing is hardcoded.
+# ══════════════════════════════════════════════════════════════
+
+# ── Piece 1: faster-whisper (Transcription) ────────────────────
+whisper:
+  model: large-v3           # Model name. Options: large-v3, large-v3-turbo, medium, small
+  language: pt              # ISO 639-1 code: pt, en, es, fr, …
+  device: cpu               # cpu | cuda | auto
+  compute_type: int8        # int8 (CPU-friendly) | float16 (GPU required)
+  beam_size: 5              # Decoder beam width (1–20). Higher = more accurate, slower.
+  vad_min_silence_ms: 500   # Minimum silence (ms) before VAD considers speech ended.
+
+# ── Piece 2: Pyannote (Speaker Diarization) ───────────────────
+diarization:
+  enabled: true             # Set to false to skip (all text labelled UNKNOWN).
+                            # HuggingFace token is read from HF_TOKEN in .env
+  device: cpu               # cpu | cuda
+  min_speakers: null        # Optional hint (null = auto-detect)
+  max_speakers: null        # Optional hint (null = auto-detect)
+
+# ── Pieces 4 & 5: Ollama (LLM) ───────────────────────────────
+llm:
+  provider: ollama
+  model: llama3.1:8b        # Model tag in Ollama. Run: ollama list
+  base_url: http://localhost:11434
+  temperature: 0.1          # Low temperature = more deterministic extraction.
+  request_timeout: 300      # Per-request timeout in seconds.
+  num_ctx: 8192             # Context window size. Default Ollama value is 2048 which
+                            # is too small. 8192 is safe for llama3.1:8b on a Mac.
+
+# ── Pipeline settings ─────────────────────────────────────────
+pipeline:
+  block_duration_minutes: 5    # Chunk size sent to LLM per extraction pass.
+                               # 5 min ≈ 750 words ≈ 1,000 tokens — safe for 8K context.
+  max_transcript_chars: 6000   # Hard cap on transcript chars per block sent to LLM.
+                               # Prevents context overflow on unexpectedly dense audio.
+  output_format: markdown      # markdown | plaintext | json
+  output_dir: outputs          # All output files are written here.
+  prompt_dir: prompts          # Directory containing prompt template .txt files.
+  save_intermediates: false    # Save intermediate JSONs (word tokens, speaker segments…)
+
+# ── Optional glossary ─────────────────────────────────────────
+# Domain-specific terms that ASR is likely to misrecognise.
+# These are included in every LLM prompt. The pipeline never fails without them.
+# Example:
+# glossary:
+#   - ENEM
+#   - termodinâmica
+#   - Boltzmann
+#   - eigenvalue
+glossary: []

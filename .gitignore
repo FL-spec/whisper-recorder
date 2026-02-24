@@ -1,5 +1,15 @@
+# Secrets
 .env
+
+# Python
 .venv/
 __pycache__/
 *.pyc
+*.pyo
+.pytest_cache/
+
+# Pipeline outputs (recordings + summaries stay local, not in git)
+outputs/
+
+# Old output from v1
 transcricao.txt

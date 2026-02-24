@@ -1,120 +1,271 @@
-# 🎙 Whisper Recorder
+# Whisper Pipeline v2
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)](https://www.apple.com/macos/)
+A fully local pipeline that takes a lecture recording and returns a clean transcript with speaker labels and a structured summary — with no data leaving your machine.
 
-A 100% local, blazing-fast voice recorder and transcriber powered by [faster-whisper](https://github.com/SYSTRAN/faster-whisper). Designed specifically for **MacBook Pro with Apple Silicon (M1–M4)**, but runs anywhere that supports Python and `faster-whisper`. 
-
-By default, it uses the highly intelligent `large-v3` model and is optimized for Portuguese (PT) dictation, but can transcribe any language supported by Whisper.
-
----
-
-## ✨ Features
-
-- **100% Local & Private:** No audio leaves your machine. Your data is yours.
-- **Highly Accurate Models:** Pre-configured with Hugging Face's `faster-whisper-large-v3` for peak intelligence and precision.
-- **Optimized Downloading:** Utilizes `hf_transfer` to saturate your network connection for model downloading.
-- **Concurrency Bulletproof:** Fixes macOS Python thread segmentation faults by managing `huggingface_hub` concurrent workers correctly.
-- **Live Incremental Transcripts:** Captures live audio and transcribes it incrementally in a beautifully formatted CLI using `Rich`.
-
----
-
-## ⚡ Installation (One-Time Setup)
-
-**1. Clone the repository**
-```bash
-git clone https://github.com/FL-spec/whisper-recorder.git
-cd whisper-recorder
+```
+python run.py
 ```
 
-**2. Create and activate a Virtual Environment**
+Press **Enter** to start recording. Press **Enter** again to stop. The full pipeline runs automatically.
+
+---
+
+## What it produces
+
+For every recording, two files are written to `outputs/`:
+
+| File | Contents |
+|---|---|
+| `recording_YYYY-MM-DD_transcript.md` | Full transcript with `[MM:SS] [SPEAKER_00]` labels per line |
+| `recording_YYYY-MM-DD_summary.md` | Structured summary: global overview · topics · key points · student questions · logistical notices |
+
+---
+
+## How it works
+
+Six steps run sequentially after recording stops. Each heavy model is fully released from memory before the next one loads.
+
+```
+[Your mic]
+    ↓
+Step 1 — faster-whisper (large-v3)
+         Transcribes audio with word-level timestamps.
+         Built-in silence filter (VAD) skips dead air automatically.
+         Output: every word with its exact start/end time.
+    ↓
+[GPU/CPU memory released]
+    ↓
+Step 2 — Pyannote Audio 3.1
+         Runs on the same original audio file.
+         Produces a map of time intervals → speaker IDs.
+         Output: "from 00:12 to 03:45 → SPEAKER_00"
+    ↓
+[GPU/CPU memory released]
+    ↓
+Step 3 — Timestamp Alignment (pure Python, no model)
+         Each word's midpoint is matched to the nearest speaker interval.
+         Consecutive same-speaker words are merged into segments.
+         Output: text blocks labelled with speaker + timestamps.
+    ↓
+Step 4 — Ollama / llama3.1:8b  [Map phase]
+         Transcript split into 5-minute blocks.
+         One LLM call per block — extracts topics, key points,
+         student questions, and logistical notices.
+         Context window explicitly set to 8 192 tokens.
+    ↓
+Step 5 — Ollama / llama3.1:8b  [Reduce phase]
+         Compact summaries of all blocks merged into one final structure.
+         Infers speaker roles (Instructor / Student).
+    ↓
+Step 6 — Output written to outputs/
+         Transcript + summary in your chosen format.
+```
+
+---
+
+## Setup
+
+### Requirements
+
+- Python 3.10+
+- [Ollama](https://ollama.com) running locally with `llama3.1:8b` pulled
+- A HuggingFace account with the Pyannote model licence accepted
+
+### 1 — Install dependencies
+
 ```bash
-python3 -m venv .venv
+python -m venv .venv
 source .venv/bin/activate
-```
-
-**3. Install Dependencies**
-```bash
 pip install -r requirements.txt
 ```
 
-**4. Set up an Environment File (Optional, but highly recommended for fast downloads)**
-Copy the provided `.env.example` file:
+### 2 — Configure your HuggingFace token
+
 ```bash
 cp .env.example .env
+# Edit .env and paste your HuggingFace token:
+# HF_TOKEN=hf_...
 ```
-Then, insert your Hugging Face token in `.env` if you have one. This guarantees maximum download speed using `hf_transfer`.
 
----
+### 3 — Accept the Pyannote model licence
 
-## 🚀 Usage
+Go to **[hf.co/pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1)** and click **"Agree and access repository"**.
 
-Execute `record.py` inside your active virtual environment.
+The model (~400 MB) downloads automatically on first run.
+
+### 4 — Pull the Ollama model
 
 ```bash
-# Start recording → Press Enter to stop → Output saved to 'transcricao.txt'
-python record.py
+ollama pull llama3.1:8b
+```
 
-# Stop automatically after 60 seconds
-python record.py --max-seconds 60
+### 5 — Pre-download the Whisper model (optional but recommended)
 
-# Save to a custom output file
-python record.py --output my_meeting_notes.txt
-
-# Disable timestamp prefixes in output
-python record.py --no-timestamps
-
-# Pre-download the model explicitly (Optional, record.py will also download it organically)
+```bash
 python download_model.py
 ```
 
-> **Note:** On your very first run, the local model (e.g., `large-v3` ~3 GB) will be quickly downloaded from the Hugging Face Hub. All subsequent executions load instantly from your local cache!
+Downloads `large-v3` (~3 GB) into the HuggingFace cache. If you skip this, it downloads automatically on first run.
 
 ---
 
-## 📂 Output Format
+## Usage
 
-Every recording is **appended** safely to your target `.txt` file, ensuring no data override:
+### Record and process
 
-```text
-# Gravação — 2026-02-24 14:32:10
+```bash
+python run.py
+```
 
-[00:02] Hello, this is a local recording test.
-[00:08] The system transcribed this without the internet.
+### Process an existing audio file (skip recording)
 
-────────────────────────────────────────────────────────────
+```bash
+python run.py --file path/to/lecture.wav
+```
+
+### All options
+
+```
+python run.py --help
+
+  --file PATH            Process an existing file instead of recording.
+  --config PATH          Custom config file (default: config.yaml).
+  --max-seconds N        Auto-stop recording after N seconds.
+  --no-diarization       Skip speaker identification (labels all text UNKNOWN).
+  --output-format        markdown | plaintext | json  (overrides config).
+  --output-dir DIR       Override output directory.
+  --save-intermediates   Save word tokens + speaker segments as JSON for debugging.
+  --list-devices         Show available audio input devices.
+  --verbose              Full debug logging.
 ```
 
 ---
 
-## 🔧 Deep-Dive Configuration
+## Configuration
 
-You can configure the properties using **Command Line Arguments** or by setting **Environment Variables** (e.g., in your `.env` file). CLI arguments always take precedence.
+All parameters are in `config.yaml`. Nothing is hardcoded.
 
-| Environment Variable | CLI Argument | Default | Description |
-|---|---|---|---|
-| `WHISPER_MODEL` | `--model` / `-m` | `large-v3` | Faster-Whisper model ID or target Hugging Face model |
-| `WHISPER_LANGUAGE` | `--language` / `-l` | `pt` | Target language for dictation (forces Whisper to skip auto-detection) |
-| `WHISPER_DEVICE` | `--device` / `-d` | `cpu` | Processing device. Options: `cpu`, `cuda`, `auto` |
-| `WHISPER_COMPUTE_TYPE` | `--compute-type` / `-c`| `int8` | Compute quantization. Options: `int8`, `float16`, `float32` |
-| `WHISPER_BEAM_SIZE` | `--beam-size` / `-b`  | `5` | Beam size for the decoder. Higher = more accurate but slower |
-| - | `--output` / `-o` | `transcricao.txt` | Target text file |
-| - | `--max-seconds` / `-s`| ∞ | Max duration of the recording before graceful stop |
-| - | `--no-timestamps` | `False` | Omit `[mm:ss]` styling from the text file output |
-| - | `--list-devices` | `False` | Display a list of available host audio devices |
-| `WHISPER_MODELS_TO_DOWNLOAD`| `download_model.py [models]`| `large-v3,large-v3-turbo` | Comma-separated list of models to download by default when running `download_model.py` |
+```yaml
+whisper:
+  model: large-v3      # or large-v3-turbo, medium, small
+  language: pt         # ISO 639-1 code: pt, en, es, fr …
+
+diarization:
+  enabled: true        # false = skip, all speakers labelled UNKNOWN
+  device: cpu          # cpu | cuda
+
+llm:
+  model: llama3.1:8b   # any model available in: ollama list
+  num_ctx: 8192        # context window — do not lower this
+
+pipeline:
+  block_duration_minutes: 5   # chunk size sent to LLM
+  max_transcript_chars: 6000  # hard cap per block (overflow protection)
+  output_format: markdown     # markdown | plaintext | json
+
+glossary:              # optional — domain-specific terms for the LLM
+  - ENEM
+  - termodinâmica
+```
+
+### Tuning for your hardware
+
+| Scenario | Recommendation |
+|---|---|
+| Mac with Apple Silicon | `device: cpu`, `compute_type: int8` — both Whisper and Pyannote run well |
+| CUDA GPU (≥6 GB VRAM) | `whisper.device: cuda`, `compute_type: float16`, `diarization.device: cuda` |
+| Slow machine | Use `model: medium` or `model: small` for Whisper |
+| Slow LLM / long lectures | Lower `block_duration_minutes` to 3 |
+| Technical domain | Fill in the `glossary` list with domain terms |
 
 ---
 
-## 🛠 System Requirements
+## Repository structure
 
-- macOS 12+ with Apple Silicon (M1/M2/M3/M4) is highly recommended for `int8`/`float16` optimizations.
-- **Python 3.10+**
-- Standard Microphone
+```
+run.py                          ← Single entrypoint (record + full pipeline)
+pipeline.py                     ← Process an existing file (no recording)
+config.yaml                     ← All parameters
+download_model.py               ← Pre-download Whisper models
+requirements.txt
+.env.example
+
+prompts/
+  extract_block.txt             ← LLM prompt for block extraction (map phase)
+  synthesize_global.txt         ← LLM prompt for global synthesis (reduce phase)
+
+whisper_pipeline/
+  config.py                     ← Pydantic config schema (validated on startup)
+  memory.py                     ← Explicit GPU/CPU cleanup between stages
+  orchestrator.py               ← Sequential pipeline coordinator
+  output_writer.py              ← Writes transcript + summary to disk
+
+  models/                       ← Internal data contracts (Pydantic)
+    word_token.py
+    speaker_segment.py
+    aligned_segment.py
+    block_result.py
+    final_output.py
+
+  interfaces/                   ← Abstract interfaces (pipeline only talks to these)
+    transcriber.py
+    diarizer.py
+    aligner.py
+    extractor.py
+    synthesizer.py
+
+  modules/                      ← Concrete implementations
+    transcriber.py              ← faster-whisper with word_timestamps=True
+    diarizer.py                 ← Pyannote 3.1
+    aligner.py                  ← Pure Python binary-search alignment
+    extractor.py                ← Ollama map-phase (one call per block)
+    synthesizer.py              ← Ollama reduce-phase (one global call)
+
+tests/
+  unit/                         ← No models loaded — fast
+    test_aligner.py
+    test_config.py
+    test_output_writer.py
+  integration/                  ← Loads real models — slow
+    test_transcriber.py
+    test_diarizer.py
+  fixtures/
+    short_audio.wav
+```
 
 ---
 
-## 📝 License
+## Running tests
 
-Distributed under the MIT License. See `LICENSE` for more information.
+```bash
+# Unit tests (fast, no models required):
+pytest tests/unit/
+
+# Integration tests (loads real models — requires HF token + Ollama):
+pytest tests/integration/ -m integration
+```
+
+---
+
+## Design principles
+
+- **Nothing hardcoded** — every parameter lives in `config.yaml` or environment variables.
+- **Each piece is independently replaceable** — swap `faster-whisper` for any other ASR model by changing only `modules/transcriber.py`.
+- **Strictly sequential with explicit memory cleanup** — heavy models are explicitly released between stages. This prevents OOM crashes on consumer hardware.
+- **All communication in structured JSON** — every module receives and returns typed Pydantic models.
+- **Graceful degradation** — if diarization fails or the LLM returns malformed JSON, the pipeline continues and labels speakers `UNKNOWN` rather than crashing.
+- **Context-window aware** — every Ollama call sets `num_ctx: 8192` explicitly (overriding Ollama's 2048 default). Transcript blocks are capped at `max_transcript_chars` characters before being sent to the LLM.
+
+---
+
+## Troubleshooting
+
+**`ollama: connection refused`** — Start Ollama with `ollama serve`.
+
+**`pyannote model not found`** — Accept the licence at [hf.co/pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1).
+
+**LLM returns empty topics** — The transcript block may be too short or contain only silence. This is expected for non-speech audio.
+
+**Diarization runs but all speakers are UNKNOWN** — Check that `HF_TOKEN` is set in `.env` and the licence is accepted.
+
+**Recording produces no audio** — Run `python run.py --list-devices` to see available input devices.

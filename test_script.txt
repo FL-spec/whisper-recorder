@@ -1,0 +1,68 @@
+TEST SCRIPT — Whisper Pipeline v2
+Use this file to test the full pipeline. Read each section aloud, then switch to a different speaker for the next section.
+Try to vary your intonation and pace between sections.
+
+====================================================================
+SECTION 1 — PROFESSORA (leia em voz firme, tom de aula)
+====================================================================
+
+Bom dia a todos. Hoje vamos falar sobre termodinâmica, mais especificamente sobre a primeira lei.
+A primeira lei da termodinâmica diz que a energia não pode ser criada nem destruída — ela apenas se transforma.
+Em outras palavras, a variação da energia interna de um sistema é igual ao calor recebido menos o trabalho realizado.
+Esse conceito é fundamental para entender processos como motores a combustão, refrigeradores e até o metabolismo humano.
+
+Vamos ver um exemplo prático. Imagine um gás dentro de um cilindro com um pistão.
+Quando aquecemos o gás, ele se expande e empurra o pistão — realizando trabalho sobre o ambiente.
+A energia que entra como calor é parcialmente convertida em trabalho mecânico e parcialmente armazenada no gás.
+
+====================================================================
+SECTION 2 — ALUNO (leia em voz mais hesitante, como pergunta real)
+====================================================================
+
+Professora, desculpa, eu não entendi muito bem.
+Quando o gás se expande, ele perde energia ou ganha?
+E o trabalho — é positivo ou negativo nesse caso?
+
+====================================================================
+SECTION 3 — PROFESSORA (resposta direta, clara)
+====================================================================
+
+Boa pergunta. Quando o gás se expande, ele realiza trabalho sobre o ambiente — portanto o trabalho é positivo pelo ponto de vista do sistema.
+Isso significa que o gás está cedendo energia para o exterior.
+Se ao mesmo tempo o gás recebe calor, a variação de energia interna depende do balanço entre o calor recebido e o trabalho realizado.
+
+====================================================================
+SECTION 4 — AVISO LOGÍSTICO (leia em tom neutro de recado)
+====================================================================
+
+Lembrando que a prova parcial será na próxima sexta-feira, dia sete de março, às quatorze horas, na sala duzentos e três.
+O conteúdo vai até a segunda lei da termodinâmica, incluindo entropia.
+Quem tiver dúvida pode me mandar email até quinta-feira à noite.
+
+====================================================================
+SECTION 5 — ENGLISH SECTION (read naturally, as if explaining)
+====================================================================
+
+Now let's quickly introduce the second law of thermodynamics.
+The second law states that in any natural thermodynamic process, the total entropy of a system and its surroundings always increases.
+Entropy is a measure of disorder — and the second law tells us that systems naturally evolve toward greater disorder.
+This is why heat flows from hot objects to cold ones, and never spontaneously in the reverse direction.
+
+====================================================================
+SECTION 6 — ENGLISH STUDENT QUESTION
+====================================================================
+
+Sorry, can you explain what entropy actually means in plain terms?
+Like, does it just mean things get messier over time?
+
+====================================================================
+SECTION 7 — ENGLISH ANSWER
+====================================================================
+
+Exactly — that's a great intuition. In everyday terms, entropy is a measure of how many ways you can arrange the parts of a system.
+A tidy room has low entropy because there's only one way it can be tidy, but many ways it can be messy.
+So yes — systems naturally drift toward higher entropy states because there are statistically more of them.
+
+====================================================================
+END OF SCRIPT
+====================================================================

@@ -1,0 +1,7 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: marks tests that load real ML models (deselect with '-m not integration')",
+]
+# Run unit tests by default; exclude integration tests unless explicitly requested.
+addopts = "-v -m 'not integration'"
